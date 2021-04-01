@@ -10,86 +10,84 @@ const static size_t s_plane_indices[3][2] = { {NB_LEFT, NB_RIGHT}, {NB_BACK, NB_
 const static size_t s_plane_orth_coord[NB_COUNT] = {X, X, Y, Y, Z, Z};
 const static bool s_plane_right[NB_COUNT] = {false, true, false, true, false, true};
 
-int get_index( Matrix3D* this, int x, int y, int z) {
-    return this->dimensions[Y] * this->dimensions[Z] * x + this->dimensions[Z] * y + z;
+size_t get_index(const Matrix3D* this, size_t x, size_t y, size_t z) {
+    return mt_y_len(this) * mt_z_len(this) * x 
+         + mt_z_len(this) * y 
+         + z;
 }
 
-double ts_get( Matrix3D* this, int x, int y, int z) {
+double mt_get(const Matrix3D* this, size_t x, size_t y, size_t z) {
     return this->data[get_index(this, x, y, z)];
 }
 
-double ts_get_ar( Matrix3D* this,  int dimensions[DIMS]) {
-    return ts_get(this, dimensions[X], dimensions[Y], dimensions[Z]);
+double mt_get_ar(const Matrix3D* this, const size_t dimensions[DIMS]) {
+    return mt_get(this, dimensions[X], dimensions[Y], dimensions[Z]);
 }
 
-double* ts_set(Matrix3D* this, int x, int y, int z) {
+const double* mt_get_ref(const Matrix3D* this, size_t x, size_t y, size_t z) {
     return &this->data[get_index(this, x, y, z)];
 }
 
- double* ts_set_c( Matrix3D* this, int x, int y, int z) {
+const double* mt_get_ref_ar(const Matrix3D* this, const size_t dimensions[DIMS]) {
+    return mt_get_ref(this, dimensions[X], dimensions[Y], dimensions[Z]);
+}
+
+double* mt_set(Matrix3D* this, size_t x, size_t y, size_t z) {
     return &this->data[get_index(this, x, y, z)];
 }
 
-double* ts_set_ar(Matrix3D* this,  int dimensions[DIMS]) {
-    return ts_set(this, dimensions[X], dimensions[Y], dimensions[Z]);
-}
-
- double* ts_set_ar_c( Matrix3D* this,  int dimensions[DIMS]) {
-    return ts_set_c(this, dimensions[X], dimensions[Y], dimensions[Z]);
+double* mt_set_ar(Matrix3D* this, const size_t dimensions[DIMS]) {
+    return mt_set(this, dimensions[X], dimensions[Y], dimensions[Z]);
 }
 
 
-void init_3d_matrix(Matrix3D* this,  int dimensions[DIMS]) {
+void mt_init(Matrix3D* this, const size_t dimensions[DIMS]) {
     memcpy(this->dimensions, dimensions, DIMS * sizeof *this->dimensions);
-    this->data = calloc(this->dimensions[X] * this->dimensions[Y] * this->dimensions[Z],  sizeof *this->data);
+    this->data = calloc(mt_x_len(this) * mt_y_len(this) * mt_z_len(this),  sizeof *this->data);
 }
 
-int ts_coord_len( Matrix3D* this, int coord) {
+size_t mt_len(const Matrix3D* this, size_t coord) {
     return this->dimensions[coord];
 }
 
-int ts_x_len( Matrix3D* this) {
-    return ts_coord_len(this, X);
+size_t mt_x_len(const Matrix3D* this) {
+    return mt_len(this, X);
 }
 
-int ts_y_len( Matrix3D* this) {
-    return ts_coord_len(this, Y);
+size_t mt_y_len(const Matrix3D* this) {
+    return mt_len(this, Y);
 }
 
-int ts_z_len( Matrix3D* this) {
-    return ts_coord_len(this, Z);
+size_t mt_z_len(const Matrix3D* this) {
+    return mt_len(this, Z);
 }
 
-double pl_get( Plane* this, int x, int y) {
-    return this->data[x * this->dimensions[Y] + y];
+double pl_get(const Plane* this, size_t x, size_t y) {
+    return this->data[x * pl_y_len(this) + y];
 }
 
-int pl_coord_len( Plane* this, int coord) {
+const double* pl_get_ref(const Plane* this, size_t x, size_t y) {
+    return &this->data[x * pl_y_len(this) + y];
+}
+
+double* pl_set(Plane* this, size_t x, size_t y) {
+    return &this->data[x * pl_y_len(this) + y];
+}
+
+size_t pl_len(const Plane* this, size_t coord) {
     return this->dimensions[coord];
 }
 
-int pl_x_len( Plane* this) {
-    return pl_coord_len(this, X);
+size_t pl_x_len(const Plane* this) {
+    return pl_len(this, X);
 }
 
-int pl_y_len( Plane* this) {
-    return pl_coord_len(this, Y);
+size_t pl_y_len(const Plane* this) {
+    return pl_len(this, Y);
 }
 
-double vc_x( Vector* this) {
-    return this->dimensions[X];
-}
-
-double vc_y( Vector* this) {
-    return this->dimensions[Y];
-}
-
-double vc_z( Vector* this) {
-    return this->dimensions[Z];
-}
-
-void init_plane(Plane* this,  int dimensions[DIMS], int excluded_coord,  int coords[2], bool right) {
-    for (int i = 0; i < 2; ++i) {
+void pl_init(Plane* this, const size_t dimensions[DIMS], size_t excluded_coord, const size_t coords[2], bool right) {
+    for (size_t i = 0; i < 2; ++i) {
         this->coords[i] = coords[i];
         this->dimensions[i] = dimensions[coords[i]];
     }
@@ -100,10 +98,10 @@ void init_plane(Plane* this,  int dimensions[DIMS], int excluded_coord,  int coo
     this->data = calloc(pl_x_len(this) * pl_y_len(this), sizeof *this->data);
 }
 
-void free_plane(Plane* this) {
+void pl_free(Plane* this) {
     free(this->data);
 }
 
-void free_3d_matrix(Matrix3D* this) {
+void mt_free(Matrix3D* this) {
     free(this->data);
 }

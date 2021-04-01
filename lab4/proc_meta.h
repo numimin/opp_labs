@@ -23,6 +23,16 @@ int pm_len_x(const ProcMeta* this);
 int pm_len_y(const ProcMeta* this);
 int pm_len_z(const ProcMeta* this);
 
+size_t pm_disc(const ProcMeta* this, size_t coord, size_t local_coord);
+size_t pm_disc_x(const ProcMeta* this, size_t local_x);
+size_t pm_disc_y(const ProcMeta* this, size_t local_y);
+size_t pm_disc_z(const ProcMeta* this, size_t local_z);
+
+size_t pm_disc_len(const ProcMeta* this, size_t coord);
+size_t pm_disc_len_x(const ProcMeta* this);
+size_t pm_disc_len_y(const ProcMeta* this);
+size_t pm_disc_len_z(const ProcMeta* this);
+
 int pm_root(const ProcMeta* this);
 int pm_rank(const ProcMeta* this);
 bool pm_is_root(const ProcMeta* this);

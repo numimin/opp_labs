@@ -36,10 +36,6 @@ typedef struct {
 } ProcMeta;
 
 typedef struct {
-    double dimensions[DIMS];
-} Vector;
-
-typedef struct {
     int dimensions[3];
     double* data;
 } Matrix3D;
@@ -79,11 +75,5 @@ typedef struct {
     size_t discrete_dimensions[DIMS];
     double local_area[DIMS];
 } ProblemData;
-
-/*typedef struct {
-    Vector offset;
-    int dimensions[DIMS];
-    int coords[DIMS];
-} LocalProblemData;*/
 
 #endif // !LAB4_TYPES_H

@@ -27,10 +27,10 @@ int init_procdata(ProcData* this, int dimensions[DIMS]) {
 }
 
 bool local_solved( Matrix3D* old,  Matrix3D* new, double epsilon) {
-    for (int x = 0; x < ts_x_len(old); ++x) {
-        for (int y = 0; y < ts_y_len(old); ++y) {
-            for (int z = 0; z < ts_z_len(old); ++z) {
-                if (fabs(ts_get(new, x, y, z) - ts_get(old, x, y, z)) 
+    for (int x = 0; x < mt_x_len(old); ++x) {
+        for (int y = 0; y < mt_y_len(old); ++y) {
+            for (int z = 0; z < mt_z_len(old); ++z) {
+                if (fabs(mt_get(new, x, y, z) - mt_get(old, x, y, z)) 
                     >= epsilon) return false;
             }
         }

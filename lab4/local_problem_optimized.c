@@ -30,38 +30,38 @@ void iterate_plane( ProblemSolver* solver,  Matrix3D* old, Matrix3D* new, int co
     int coords[2];
     coords_without(coord, coords);
 
-     int coord_index = right ? ts_coord_len(old, coord) : 0;
-     int neighbor_index = right ? ts_coord_len(old, coord) - 1 : 1;
+     int coord_index = right ? mt_len(old, coord) : 0;
+     int neighbor_index = right ? mt_len(old, coord) - 1 : 1;
 
     int dims[DIMS] = {};
     dims[coord] = coord_index;
 
-    for (dims[coords[0]] = 0; dims[coords[0]] < ts_coord_len(old, coords[0]); ++dims[coords[0]]) {
-        for (dims[coords[1]] = 0; dims[coords[1]] < ts_coord_len(old, coords[1]); ++dims[coords[1]]) {
+    for (dims[coords[0]] = 0; dims[coords[0]] < mt_len(old, coords[0]); ++dims[coords[0]]) {
+        for (dims[coords[1]] = 0; dims[coords[1]] < mt_len(old, coords[1]); ++dims[coords[1]]) {
             dims[coord] = neighbor_index;
-            double res = ts_get_ar(old, dims) / get_h_2(solver, coord);
+            double res = mt_get_ar(old, dims) / get_h_2(solver, coord);
             dims[coord] = coord_index;
-            *ts_set_ar(new, dims) = res;
+            *mt_set_ar(new, dims) = res;
         }
     }
     
-    for (dims[coords[0]] = 1; dims[coords[0]] < ts_coord_len(old, coords[0]) - 1; ++dims[coords[0]]) {
-        for (dims[coords[1]] = 1; dims[coords[1]] < ts_coord_len(old, coords[1]) - 1; ++dims[coords[1]]) {
+    for (dims[coords[0]] = 1; dims[coords[0]] < mt_len(old, coords[0]) - 1; ++dims[coords[0]]) {
+        for (dims[coords[1]] = 1; dims[coords[1]] < mt_len(old, coords[1]) - 1; ++dims[coords[1]]) {
             for (int i = 0; i < 2; ++i) {
                 double res = 0;
 
                 dims[coords[i]] += 1;
-                res += ts_get_ar(old, dims);
+                res += mt_get_ar(old, dims);
 
                 dims[coords[i]] -= 2;
-                res += ts_get_ar(old, dims) / get_h_2(solver, coords[i]);
+                res += mt_get_ar(old, dims) / get_h_2(solver, coords[i]);
 
                 dims[coords[i]] += 1;
                 res /= get_h_2(solver, coords[i]);
-                *ts_set_ar(new, dims) += res;
+                *mt_set_ar(new, dims) += res;
             }
 
-            *ts_set_ar(new, dims) -= ts_get_ar(&solver->rho, dims);
+            *mt_set_ar(new, dims) -= mt_get_ar(&solver->rho, dims);
         }
     }
 }
@@ -75,10 +75,10 @@ void ps_swap_cubes(LocalProblem* this) {
 //add evetything that the Plane can provide, doesn't multiply
 void finish_iteration( ProblemSolver* solver,  Plane* old, Matrix3D* new) {
     int dims[DIMS] = {};
-    dims[old->excluded_coord] = old->right ? ts_coord_len(new, old->excluded_coord) : 0;
-    for (dims[old->coords[X]] = 0; dims[old->coords[X]] < ts_coord_len(new, old->coords[X]); ++dims[old->coords[X]]) {
-        for (dims[old->coords[Y]] = 0; dims[old->coords[Y]] < ts_coord_len(new, old->coords[Y]); ++dims[old->coords[Y]]) {
-            *ts_set_ar(new, dims) += pl_get(old, dims[old->coords[X]], dims[old->coords[Y]]) / get_h_2(solver, old->excluded_coord);
+    dims[old->excluded_coord] = old->right ? mt_len(new, old->excluded_coord) : 0;
+    for (dims[old->coords[X]] = 0; dims[old->coords[X]] < mt_len(new, old->coords[X]); ++dims[old->coords[X]]) {
+        for (dims[old->coords[Y]] = 0; dims[old->coords[Y]] < mt_len(new, old->coords[Y]); ++dims[old->coords[Y]]) {
+            *mt_set_ar(new, dims) += pl_get(old, dims[old->coords[X]], dims[old->coords[Y]]) / get_h_2(solver, old->excluded_coord);
         }
     }
 }
@@ -88,14 +88,14 @@ void multiply_plane(Matrix3D* new, double factor, int coord, bool right, int coo
     int end[2];
     for (int i = 0; i < 2; ++i) {
         start[i] = shrink[i] ? 1 : 0;
-        end[i] = shrink[i] ? ts_coord_len(new, coords[i]) - 1 : ts_coord_len(new, coords[i]);
+        end[i] = shrink[i] ? mt_len(new, coords[i]) - 1 : mt_len(new, coords[i]);
     }
 
     int dims[DIMS] = {};
-    dims[coord] = right ? ts_coord_len(new, coord) : 0;
+    dims[coord] = right ? mt_len(new, coord) : 0;
     for (dims[coords[0]] = start[0]; dims[coords[0]] < end[0]; ++dims[coords[0]]) {
         for (dims[coords[1]] = start[1]; dims[coords[1]] < end[1]; ++dims[coords[1]]) {
-            *ts_set_ar(new, dims) *= factor;
+            *mt_set_ar(new, dims) *= factor;
         }
     }
 }
@@ -116,14 +116,14 @@ void ps_finish_plane( ProblemSolver* solver, LocalProblem* this, int plane_index
 
 //iterates over everything that exists
 void iterate( ProblemSolver* this,  Matrix3D* old, Matrix3D* new) {
-    for (int x = 1; x < ts_x_len(old) - 1; ++x) {
-        for (int y = 1; y < ts_y_len(old) - 1; ++y) {
-            for (int z = 1; z < ts_z_len(old) - 1; ++z) {
-                *ts_set(new, x, y, z) = this->factor * (
-                    (ts_get(old, x + 1, y, z) + ts_get(old, x - 1, y, z)) / get_h_x_2(this) +
-                    (ts_get(old, x, y + 1, z) + ts_get(old, x, y - 1, z)) / get_h_y_2(this) +
-                    (ts_get(old, x, y, z + 1) + ts_get(old, x, y, z - 1)) / get_h_z_2(this) -
-                     ts_get(&this->rho, x, y, z));
+    for (int x = 1; x < mt_x_len(old) - 1; ++x) {
+        for (int y = 1; y < mt_y_len(old) - 1; ++y) {
+            for (int z = 1; z < mt_z_len(old) - 1; ++z) {
+                *mt_set(new, x, y, z) = this->factor * (
+                    (mt_get(old, x + 1, y, z) + mt_get(old, x - 1, y, z)) / get_h_x_2(this) +
+                    (mt_get(old, x, y + 1, z) + mt_get(old, x, y - 1, z)) / get_h_y_2(this) +
+                    (mt_get(old, x, y, z + 1) + mt_get(old, x, y, z - 1)) / get_h_z_2(this) -
+                     mt_get(&this->rho, x, y, z));
             }
         }
     }
@@ -141,7 +141,7 @@ void ps_iterate( ProblemSolver* solver, LocalProblem* problem) {
 
 void init_solver(ProblemSolver* this,  LocalProblemData* local_task,  ProblemData* data) {
     this->factor = pd_factor(data);
-    init_3d_matrix(&this->rho, local_task->dimensions);
+    mt_init(&this->rho, local_task->dimensions);
     get_rho(data, local_task, &this->rho);
 
     this->h_2[X] = pd_h_x(data) * pd_h_x(data);
@@ -175,16 +175,16 @@ Plane* get_in_plane(LocalProblem* this, int index) {
 
 double* get_out_plane(LocalProblem* this, int index) {
      int coord = s_plane_orth_coord[index];
-     int coord_index = s_plane_right[index] ? ts_coord_len(get_old(this), coord) : 0;
+     int coord_index = s_plane_right[index] ? mt_len(get_old(this), coord) : 0;
 
     int dims[DIMS] = {};
     dims[coord] = coord_index;
-    return ts_set_ar(get_new(this), dims);
+    return mt_set_ar(get_new(this), dims);
 }
 
  double* get_out_plane_c( LocalProblem* this, int index) {
      int coord = s_plane_orth_coord[index];
-     int coord_index = s_plane_right[index] ? ts_coord_len(get_old(this), coord) : 0;
+     int coord_index = s_plane_right[index] ? mt_len(get_old(this), coord) : 0;
 
     int dims[DIMS] = {};
     dims[coord] = coord_index;
@@ -193,7 +193,7 @@ double* get_out_plane(LocalProblem* this, int index) {
 
 void init_local_problem(LocalProblem* this,  LocalProblemData* local_task) {
     for (int i = 0; i < 2; ++i) {
-        init_3d_matrix(&this->slice[i], local_task->dimensions);
+        mt_init(&this->slice[i], local_task->dimensions);
     }
 
     this->old = 0;
@@ -201,7 +201,7 @@ void init_local_problem(LocalProblem* this,  LocalProblemData* local_task) {
 
     for (int coord = 0; coord < 3; ++coord) {
         for (bool right = true; right; right = !right) {
-            init_plane(&this->neighbours[s_plane_indices[coord][right]], 
+            pl_init(&this->neighbours[s_plane_indices[coord][right]], 
                 local_task->dimensions, coord, s_plane_coords[coord], right);
         }
     }

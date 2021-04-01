@@ -164,3 +164,35 @@ bool pm_is_root(const ProcMeta* this) {
 size_t pm_count(const ProcMeta* this) {
     return this->proc_count;
 }
+
+size_t pm_disc(const ProcMeta* this, size_t coord, size_t local_coord) {
+    return this->task_coords[coord] + local_coord;
+}
+
+size_t pm_disc_x(const ProcMeta* this, size_t local_x) {
+    return pm_disc(this, X, local_x);
+}
+
+size_t pm_disc_y(const ProcMeta* this, size_t local_y) {
+    return pm_disc(this, Y, local_y);
+}
+
+size_t pm_disc_z(const ProcMeta* this, size_t local_z) {
+    return pm_disc(this, Z, local_z);
+}
+
+size_t pm_disc_len(const ProcMeta* this, size_t coord) {
+    return this->task_dims[coord];
+}
+
+size_t pm_disc_len_x(const ProcMeta* this) {
+    return pm_disc_len(this, X);
+}
+
+size_t pm_disc_len_y(const ProcMeta* this) {
+    return pm_disc_len(this, Y);
+}
+
+size_t pm_disc_len_z(const ProcMeta* this) {
+    return pm_disc_len(this, Z);
+}
