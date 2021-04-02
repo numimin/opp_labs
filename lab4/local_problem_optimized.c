@@ -1,208 +1,232 @@
 #include "local_problem.h"
 
-void coords_without(int excluded, int coords[2]) {
-    int coord_idx = 0;
-    for (int i = 0; i < 3; ++i) {
-        if (excluded != i) {
-            coords[coord_idx++] = i;
-        }
-    }
+#include "functional.h"
+#include "proc_meta.h"
+
+double get_h_2(const LocalProblem* this, size_t coord) {
+    return this->constants.h_2[coord];
 }
 
-double get_h_2( ProblemSolver* this, int coord) {
-    return this->h_2[coord];
-}
-
-double get_h_x_2( ProblemSolver* this) {
+double get_h_x_2(const LocalProblem* this) {
     return get_h_2(this, X);
 }
 
-double get_h_y_2( ProblemSolver* this) {
+double get_h_y_2(const LocalProblem* this) {
     return get_h_2(this, Y);
 }
 
-double get_h_z_2( ProblemSolver* this) {
+double get_h_z_2(const LocalProblem* this) {
     return get_h_2(this, Z);
 }
 
-//iterates everything that knows but doesn't add what doesn't know and multiply by factor;
-void iterate_plane( ProblemSolver* solver,  Matrix3D* old, Matrix3D* new, int coord, bool right) {
-    int coords[2];
-    coords_without(coord, coords);
-
-     int coord_index = right ? mt_len(old, coord) : 0;
-     int neighbor_index = right ? mt_len(old, coord) - 1 : 1;
-
-    int dims[DIMS] = {};
-    dims[coord] = coord_index;
-
-    for (dims[coords[0]] = 0; dims[coords[0]] < mt_len(old, coords[0]); ++dims[coords[0]]) {
-        for (dims[coords[1]] = 0; dims[coords[1]] < mt_len(old, coords[1]); ++dims[coords[1]]) {
-            dims[coord] = neighbor_index;
-            double res = mt_get_ar(old, dims) / get_h_2(solver, coord);
-            dims[coord] = coord_index;
-            *mt_set_ar(new, dims) = res;
-        }
-    }
-    
-    for (dims[coords[0]] = 1; dims[coords[0]] < mt_len(old, coords[0]) - 1; ++dims[coords[0]]) {
-        for (dims[coords[1]] = 1; dims[coords[1]] < mt_len(old, coords[1]) - 1; ++dims[coords[1]]) {
-            for (int i = 0; i < 2; ++i) {
-                double res = 0;
-
-                dims[coords[i]] += 1;
-                res += mt_get_ar(old, dims);
-
-                dims[coords[i]] -= 2;
-                res += mt_get_ar(old, dims) / get_h_2(solver, coords[i]);
-
-                dims[coords[i]] += 1;
-                res /= get_h_2(solver, coords[i]);
-                *mt_set_ar(new, dims) += res;
-            }
-
-            *mt_set_ar(new, dims) -= mt_get_ar(&solver->rho, dims);
-        }
-    }
+const Matrix3D* get_rho(const LocalProblem* this) {
+    return &this->constants.rho;
 }
 
-void ps_swap_cubes(LocalProblem* this) {
-    int tmp = this->old;
+double get_factor(const LocalProblem* this) {
+    return this->constants.factor;
+}
+
+void lp_swap_cubes(LocalProblem* this) {
+    size_t tmp = this->old;
     this->old = this->new;
     this->new = tmp;
 }
 
+typedef struct {
+    Matrix3D* matrix;
+    double factor;
+} PlaneMulData;
+
+void plane_mul(PlaneIndex* index, LocalProblem* problem) {
+    *mt_set_ar(lp_new_mat(problem), index->dims) *= get_factor(problem);
+}
+
+void lp_multiply_edges(LocalProblem* this) {
+    for (size_t i = 0; i < NB_COUNT; ++i) {
+        pi_iterate(&this->plane_mul_iterators[i], plane_mul, this);
+    }
+}
+
+typedef struct {
+    LocalProblem* problem;
+    Plane* plane;
+} IteratorData;
+
+void plane_finish(PlaneIndex* index, IteratorData* data) {
+    *mt_set_ar(lp_new_mat(data->problem), index->dims) += 
+        pl_get(data->plane, pi_get_x(index), pi_get_y(index)) / 
+        data->problem->constants.h_2[pi_get_ort(index)];
+}
+
 //add evetything that the Plane can provide, doesn't multiply
-void finish_iteration( ProblemSolver* solver,  Plane* old, Matrix3D* new) {
-    int dims[DIMS] = {};
-    dims[old->excluded_coord] = old->right ? mt_len(new, old->excluded_coord) : 0;
-    for (dims[old->coords[X]] = 0; dims[old->coords[X]] < mt_len(new, old->coords[X]); ++dims[old->coords[X]]) {
-        for (dims[old->coords[Y]] = 0; dims[old->coords[Y]] < mt_len(new, old->coords[Y]); ++dims[old->coords[Y]]) {
-            *mt_set_ar(new, dims) += pl_get(old, dims[old->coords[X]], dims[old->coords[Y]]) / get_h_2(solver, old->excluded_coord);
-        }
-    }
+void lp_finish_plane(LocalProblem* this, size_t plane_index) {
+    Plane* plane = lp_in_plane(this, plane_index);
+    IteratorData data = {.plane=plane, .problem=this};
+    pi_iterate(&this->plane_iterators[plane_index], plane_finish, &data);
 }
 
-void multiply_plane(Matrix3D* new, double factor, int coord, bool right, int coords[2], bool shrink[2]) {
-    int start[2];
-    int end[2];
-    for (int i = 0; i < 2; ++i) {
-        start[i] = shrink[i] ? 1 : 0;
-        end[i] = shrink[i] ? mt_len(new, coords[i]) - 1 : mt_len(new, coords[i]);
-    }
+void calculate_next_phi(LocalProblem* this, size_t x, size_t y, size_t z) {
+    const Matrix3D* old = lp_old_mat(this);
+    Matrix3D* new = lp_new_mat(this);
 
-    int dims[DIMS] = {};
-    dims[coord] = right ? mt_len(new, coord) : 0;
-    for (dims[coords[0]] = start[0]; dims[coords[0]] < end[0]; ++dims[coords[0]]) {
-        for (dims[coords[1]] = start[1]; dims[coords[1]] < end[1]; ++dims[coords[1]]) {
-            *mt_set_ar(new, dims) *= factor;
-        }
-    }
+    *mt_set(new, x, y, z) = this->constants.factor * (
+        (mt_get(old, x + 1, y, z) + mt_get(old, x - 1, y, z)) / get_h_x_2(this) +
+        (mt_get(old, x, y + 1, z) + mt_get(old, x, y - 1, z)) / get_h_y_2(this) +
+        (mt_get(old, x, y, z + 1) + mt_get(old, x, y, z - 1)) / get_h_z_2(this) -
+            mt_get(get_rho(this), x, y, z));
 }
 
-void ps_multiply_edges(Matrix3D* new, double factor) {
-     static bool shrink[3][2] = {{false, false}, {false, true}, {true, true}};
+typedef struct {
+    LocalProblem* problem;
+    size_t neighbor_index;
+} NeighborAddData;
 
-    for (int coord = 0; coord < DIMS; ++coord) {
-        for (bool right = true; right; right = !right) {
-            multiply_plane(new, factor, coord, right, s_plane_coords[coord], shrink[coord]);
-        }
-    }
+void plane_neighbor_add(PlaneIndex* index, NeighborAddData* data) {
+    const size_t coord_index = pi_get_ort(index);
+
+    *pi_set_ort(index) = data->neighbor_index;
+    const double res = mt_get_ar(lp_old_mat(data), index->dims) / get_h_2(data->problem, coord_index);
+
+    *pi_set_ort(index) = coord_index;
+    *mt_set_ar(lp_new_mat(data->problem), index->dims) = res;
 }
 
-void ps_finish_plane( ProblemSolver* solver, LocalProblem* this, int plane_index) {
-    finish_iteration(solver, get_in_plane_c(this, plane_index), get_new(this));
+void plane_inner_add(PlaneIndex* index, LocalProblem* problem) {
+    for (size_t coord = 0; coord < 2; ++coord) {
+        double res = 0;
+
+        *pi_set_coord(index, coord) += 1;
+        res += mt_get_ar(lp_old_mat(problem), index->dims);
+
+        *pi_set_coord(index, coord) -= 2;
+        res += mt_get_ar(lp_old_mat(problem), index->dims);
+        res /= get_h_2(problem, pi_coord_idx(index, coord));
+
+        *pi_set_coord(index, coord) += 1;
+        *mt_set_ar(lp_new_mat(problem), index->dims) += res;
+    }
+
+    *mt_set_ar(lp_new_mat(problem), index->dims) -= mt_get_ar(get_rho(problem), index->dims);
 }
 
 //iterates over everything that exists
-void iterate( ProblemSolver* this,  Matrix3D* old, Matrix3D* new) {
-    for (int x = 1; x < mt_x_len(old) - 1; ++x) {
-        for (int y = 1; y < mt_y_len(old) - 1; ++y) {
-            for (int z = 1; z < mt_z_len(old) - 1; ++z) {
-                *mt_set(new, x, y, z) = this->factor * (
-                    (mt_get(old, x + 1, y, z) + mt_get(old, x - 1, y, z)) / get_h_x_2(this) +
-                    (mt_get(old, x, y + 1, z) + mt_get(old, x, y - 1, z)) / get_h_y_2(this) +
-                    (mt_get(old, x, y, z + 1) + mt_get(old, x, y, z - 1)) / get_h_z_2(this) -
-                     mt_get(&this->rho, x, y, z));
-            }
-        }
-    }
+void lp_iterate(LocalProblem* this) {
+    const size_t order[DIMS] = {X, Y, Z};
+    const Extent extents[DIMS] = {
+        {.start=1, .end=mt_x_len(lp_old_mat(this)) - 1},
+        {.start=1, .end=mt_y_len(lp_old_mat(this)) - 1},
+        {.start=1, .end=mt_z_len(lp_old_mat(this)) - 1},
+    };
 
-    for (int coord = 0; coord < DIMS; ++coord) {
-        for (bool right = true; right; right = !right) {
-            iterate_plane(this, old, new, coord, right);
-        }
+    fn_iterate_n3(order, extents, calculate_next_phi);
+
+    for (size_t i = 0; i < NB_COUNT; ++i) {
+        NeighborAddData data = {.neighbor_index=this->plane_neighbor_indices[i], .problem=this};
+        pi_iterate(&this->plane_iterators[i], plane_neighbor_add, &data);
+        pi_iterate(&this->plane_edged_iterators[i], plane_inner_add, this);
     }
 }
 
-void ps_iterate( ProblemSolver* solver, LocalProblem* problem) {
-    iterate(solver, get_old(problem), get_new(problem));
+typedef struct {
+    Matrix3D* rho;
+    const ProblemData* data;
+    const ProcMeta* meta;
+} RhoInitData;
+
+void fill_rho(RhoInitData* data, size_t x, size_t y, size_t z) {
+    size_t discrete_point[DIMS];
+    discrete_point[X] = pm_disc_x(data->meta, x);
+    discrete_point[Y] = pm_disc_y(data->meta, y);
+    discrete_point[Z] = pm_disc_z(data->meta, z);
+    *mt_set(data, x, y, z) = pd_rho(data->data, discrete_point);
 }
 
-void init_solver(ProblemSolver* this,  LocalProblemData* local_task,  ProblemData* data) {
+void init_constants(Constants* this, const ProblemData* data, const ProcMeta* meta) {
     this->factor = pd_factor(data);
-    mt_init(&this->rho, local_task->dimensions);
-    get_rho(data, local_task, &this->rho);
 
     this->h_2[X] = pd_h_x(data) * pd_h_x(data);
     this->h_2[Y] = pd_h_y(data) * pd_h_y(data);
     this->h_2[Z] = pd_h_z(data) * pd_h_z(data);
+
+    mt_init(&this->rho, meta->task_dims);
+
+    const size_t order[DIMS] = {X, Y, Z};
+    const Extent extents[DIMS] = {
+        {.start=0, .end=mt_x_len(&this->rho)},
+        {.start=0, .end=mt_y_len(&this->rho)},
+        {.start=0, .end=mt_z_len(&this->rho)},
+    };
+
+    RhoInitData rho_data = {.rho=&this->rho, .data=data, .meta=meta};
+    fn_iterate(order, extents, fill_rho, &rho_data);
 }
 
-Matrix3D* get_old(LocalProblem* this) {
-    return &this->slice[this->old];
-}
+void lp_init(LocalProblem* this, const ProblemData* data, const ProcMeta* meta) {
+    init_constants(&this->constants, data, meta);
 
- Matrix3D* get_old_c( LocalProblem* this) {
-    return &this->slice[this->old];
-}
-
-Matrix3D* get_new(LocalProblem* this) {
-    return &this->slice[this->new];
-}
-
- Matrix3D* get_new_c( LocalProblem* this) {
-    return &this->slice[this->new];
-}
-
-Plane* get_in_plane(LocalProblem* this, int index) {
-    return &this->neighbours[index];
-}
-
- Plane* get_in_plane_c( LocalProblem* this, int index) {
-    return &this->neighbours[index];
-}
-
-double* get_out_plane(LocalProblem* this, int index) {
-     int coord = s_plane_orth_coord[index];
-     int coord_index = s_plane_right[index] ? mt_len(get_old(this), coord) : 0;
-
-    int dims[DIMS] = {};
-    dims[coord] = coord_index;
-    return mt_set_ar(get_new(this), dims);
-}
-
- double* get_out_plane_c( LocalProblem* this, int index) {
-     int coord = s_plane_orth_coord[index];
-     int coord_index = s_plane_right[index] ? mt_len(get_old(this), coord) : 0;
-
-    int dims[DIMS] = {};
-    dims[coord] = coord_index;
-    return ts_set_ar_c(get_new(this), dims);
-}
-
-void init_local_problem(LocalProblem* this,  LocalProblemData* local_task) {
     for (int i = 0; i < 2; ++i) {
-        mt_init(&this->slice[i], local_task->dimensions);
+        mt_init(&this->slice[i], meta->task_dims[i]);
     }
 
     this->old = 0;
     this->new = 1;
 
-    for (int coord = 0; coord < 3; ++coord) {
+    const static bool shrink[3][2] = {{false, false}, {false, true}, {true, true}};
+
+    for (size_t coord = 0; coord < DIMS; ++coord) {
+        Extent plane_extents[2];
+        Extent edged_plane_extents[2];
+        Extent mul_plane_extents[2];
+
+        for (size_t i = 0; i < 2; ++i) {
+            plane_extents[i].start = 0;
+            plane_extents[i].end = meta->task_dims[s_plane_coords[coord][i]];
+
+            edged_plane_extents[i].start = 1;
+            edged_plane_extents[i].start = meta->task_dims[s_plane_coords[coord][i]] - 1;
+
+            mul_plane_extents[i].start = shrink[coord][i] ? edged_plane_extents[i].start : plane_extents[i].start;
+            mul_plane_extents[i].end = shrink[coord][i] ? edged_plane_extents[i].end : plane_extents[i].end;
+        }
+
+        const size_t plane_dims[2] = {plane_extents[0].end, plane_extents[1].end};
+
         for (bool right = true; right; right = !right) {
-            pl_init(&this->neighbours[s_plane_indices[coord][right]], 
-                local_task->dimensions, coord, s_plane_coords[coord], right);
+            const size_t plane_index = s_plane_indices[coord][right];
+            pl_init(&this->neighbours[plane_index], plane_dims);
+
+            const size_t coord_index = right ? meta->task_dims[coord] - 1 : 0;
+            pi_init(&this->plane_iterators[plane_index], 
+                coord, coord_index,
+                s_plane_coords[coord], plane_extents);
+            pi_init(&this->plane_edged_iterators[plane_index], 
+                coord, coord_index,
+                s_plane_coords[coord], edged_plane_extents);
+            pi_init(&this->plane_mul_iterators[plane_index], 
+                coord, coord_index,
+                s_plane_coords[coord], edged_plane_extents);
         }
     }
+}
+
+Matrix3D* lp_old_mat(LocalProblem* this) {
+    return &this->slice[this->old];
+}
+
+Matrix3D* lp_new_mat(LocalProblem* this) {
+    return &this->slice[this->new];
+}
+
+Plane* lp_in_plane(LocalProblem* this, size_t index) {
+    return &this->neighbours[index];
+}
+
+double* lp_out_plane(LocalProblem* this, size_t index) {
+     int coord = s_plane_orth_coord[index];
+     int coord_index = s_plane_right[index] ? mt_len(lp_old_mat(this), coord) : 0;
+
+    int dims[DIMS] = {};
+    dims[coord] = coord_index;
+    return mt_set_ar(lp_new_mat(this), dims);
 }

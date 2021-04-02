@@ -6,23 +6,17 @@
 #include "matrix_3d.h"
 #include "problem_data.h"
 
-void ps_iterate( ProblemSolver* solver, LocalProblem* problem);
-void ps_swap_cubes(LocalProblem* this);
-void ps_finish_plane( ProblemSolver* solver, LocalProblem* this, int plane_index);
-void ps_multiply_edges(Matrix3D* new, double factor);
-void init_solver(ProblemSolver* this,  LocalProblemData* local_data,  ProblemData* data);
+void lp_init(LocalProblem* this, const ProblemData* data, const ProcMeta* meta);
 
-Matrix3D* get_old(LocalProblem* this);
-Matrix3D* get_new(LocalProblem* this);
+void lp_iterate(LocalProblem* this);
+void lp_swap_cubes(LocalProblem* this);
+void lp_finish_plane(LocalProblem* this, size_t plane_index);
+void lp_multiply_edges(LocalProblem* this);
 
- Matrix3D* get_old_c( LocalProblem* this);
- Matrix3D* get_new_c( LocalProblem* this);
+Matrix3D* lp_old_mat(LocalProblem* this);
+Matrix3D* lp_new_mat(LocalProblem* this);
 
-Plane* get_in_plane(LocalProblem* this, int index);
- Plane* get_in_plane_c( LocalProblem* this, int index);
-double* get_out_plane(LocalProblem* this, int index);
- double* get_out_plane_c( LocalProblem* this, int index);
-
-void init_local_problem(LocalProblem* this,  LocalProblemData* local_task);
+Plane* lp_in_plane(LocalProblem* this, size_t index);
+double* lp_out_plane(LocalProblem* this, size_t index);
 
 #endif // !LAB4_LOCAL_PROBLEM_H

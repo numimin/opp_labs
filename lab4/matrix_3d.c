@@ -17,7 +17,7 @@ size_t get_index(const Matrix3D* this, size_t x, size_t y, size_t z) {
 }
 
 double mt_get(const Matrix3D* this, size_t x, size_t y, size_t z) {
-    return this->data[get_index(this, x, y, z)];
+    return mt_get_by_i(this, get_index(this, x, y, z));
 }
 
 double mt_get_ar(const Matrix3D* this, const size_t dimensions[DIMS]) {
@@ -25,7 +25,7 @@ double mt_get_ar(const Matrix3D* this, const size_t dimensions[DIMS]) {
 }
 
 const double* mt_get_ref(const Matrix3D* this, size_t x, size_t y, size_t z) {
-    return &this->data[get_index(this, x, y, z)];
+    return mt_get_ref_by_i(this, get_index(this, x, y, z));
 }
 
 const double* mt_get_ref_ar(const Matrix3D* this, const size_t dimensions[DIMS]) {
@@ -33,13 +33,24 @@ const double* mt_get_ref_ar(const Matrix3D* this, const size_t dimensions[DIMS])
 }
 
 double* mt_set(Matrix3D* this, size_t x, size_t y, size_t z) {
-    return &this->data[get_index(this, x, y, z)];
+    return mt_set_by_i(this, get_index(this, x, y, z));
 }
 
 double* mt_set_ar(Matrix3D* this, const size_t dimensions[DIMS]) {
     return mt_set(this, dimensions[X], dimensions[Y], dimensions[Z]);
 }
 
+double mt_get_by_i(const Matrix3D* this, size_t index) {
+    return this->data[index];
+}
+
+const double* mt_get_ref_by_i(const Matrix3D* this, size_t index) {
+    return &this->data[index];
+}
+
+double* mt_set_by_i(Matrix3D* this, size_t index) {
+    return &this->data[index];
+}
 
 void mt_init(Matrix3D* this, const size_t dimensions[DIMS]) {
     memcpy(this->dimensions, dimensions, DIMS * sizeof *this->dimensions);
@@ -86,14 +97,10 @@ size_t pl_y_len(const Plane* this) {
     return pl_len(this, Y);
 }
 
-void pl_init(Plane* this, const size_t dimensions[DIMS], size_t excluded_coord, const size_t coords[2], bool right) {
+void pl_init(Plane* this, const size_t dimensions[2]) {
     for (size_t i = 0; i < 2; ++i) {
-        this->coords[i] = coords[i];
-        this->dimensions[i] = dimensions[coords[i]];
+        this->dimensions[i] = dimensions[i];
     }
-
-    this->right = right;
-    this->excluded_coord = excluded_coord;
 
     this->data = calloc(pl_x_len(this) * pl_y_len(this), sizeof *this->data);
 }

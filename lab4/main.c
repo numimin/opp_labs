@@ -14,14 +14,13 @@
 typedef struct {
     ProcMeta meta;
     ProblemData task;
-    LocalProblemData local_task;
     LocalProblem problem;
 } ProcData;
 
 int init_procdata(ProcData* this, int dimensions[DIMS]) {
     pd_init(&this->task);
     if (pm_init(&this->meta, &this->local_task, &this->task, dimensions) != EXIT_SUCCESS) return EXIT_FAILURE;
-    init_local_problem(&this->problem, &this->local_task);
+    lp_init(&this->problem, &this->local_task);
 
     return EXIT_SUCCESS;
 }
@@ -73,7 +72,7 @@ void isend_plane( ProcData* data, int plane_index, MPI_Request out_requests[NB_C
 }
 
 void irecv_plane(ProcData* data, int plane_index, MPI_Request in_requests[NB_COUNT], int tag) {
-     Plane* plane = get_in_plane(&data->problem, plane_index);
+     Plane* plane = lp_in_plane(&data->problem, plane_index);
     MPI_Irecv(plane->data, pl_x_len(plane) * pl_y_len(plane), MPI_DOUBLE,
         pm_neighbour(&data->meta, plane_index), tag, pm_comm(&data->meta), 
         &in_requests[plane_index]);
@@ -91,21 +90,21 @@ void solve_equation(ProcData* data, double epsilon) {
     MPI_Request out_requests[NB_COUNT];
     isend_neighbour_planes(data, out_requests, tag);
 
-    ProblemSolver solver;
+    Constants solver;
     init_solver(&solver, &data->local_task, &data->task);
 
     while (!global_solved(
         &data->meta,
-        get_old(&data->problem),
-        get_new(&data->problem), epsilon)) {
+        lp_old_mat(&data->problem),
+        lp_new_mat(&data->problem), epsilon)) {
 
         MPI_Request in_requests[NB_COUNT];
         for (int i = 0; i < NB_COUNT; ++i) {
             irecv_plane(data, i, in_requests, tag);
         }
 
-        ps_swap_cubes(&data->problem);
-        ps_iterate(&solver, &data->problem);
+        lp_swap_cubes(&data->problem);
+        lp_iterate(&solver, &data->problem);
 
         int planes_processed = 0;
         while (planes_processed < NB_COUNT) {
@@ -113,9 +112,9 @@ void solve_equation(ProcData* data, double epsilon) {
             MPI_Waitany(NB_COUNT, in_requests, &plane_index, MPI_STATUS_IGNORE);
             in_requests[plane_index] = MPI_REQUEST_NULL;
 
-            ps_finish_plane(&solver, &data->problem, plane_index);
+            lp_finish_plane(&solver, &data->problem, plane_index);
         }
-        ps_multiply_edges(get_new(&data->problem), solver.factor);
+        lp_multiply_edges(lp_new_mat(&data->problem), solver.factor);
 
         MPI_Waitall(NB_COUNT, out_requests, MPI_STATUSES_IGNORE);
         isend_neighbour_planes(data, out_requests, tag);

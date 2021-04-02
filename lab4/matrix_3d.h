@@ -24,7 +24,11 @@ double mt_get_ar(const Matrix3D* this, const size_t dimensions[DIMS]);
 const double* mt_get_ref_ar(const Matrix3D* this, const size_t dimensions[DIMS]);
 double* mt_set_ar(Matrix3D* this, const size_t dimensions[DIMS]);
 
-void pl_init(Plane* this, const size_t dimensions[DIMS], size_t excluded_coord, const size_t coords[2], bool right);
+double mt_get_by_i(const Matrix3D* this, size_t index);
+const double* mt_get_ref_by_i(const Matrix3D* this, size_t index);
+double* mt_set_by_i(Matrix3D* this, size_t index);
+
+void pl_init(Plane* this, const size_t dimensions[2]);
 
 double pl_get(const Plane* this, size_t x, size_t y);
 const double* pl_get_ref(const Plane* this, size_t x, size_t y);

@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <mpi.h>
 
+#include "functional.h"
+
 #define NB_LEFT 0 //(X, F)
 #define NB_RIGHT 1 //(X, T)
 #define NB_FRONT 2 //(Y, F)
@@ -36,31 +38,35 @@ typedef struct {
 } ProcMeta;
 
 typedef struct {
-    int dimensions[3];
+    size_t dimensions[3];
     double* data;
 } Matrix3D;
 
 typedef struct {
-    int coords[2];
-    int dimensions[2];
-    int excluded_coord;
-    bool right;
+    size_t dimensions[2];
     double* data;
 } Plane;
-
-typedef struct {
-    Matrix3D slice[2]; //old and new
-    Plane neighbours[NB_COUNT];
-
-    int old;
-    int new;
-} LocalProblem;
 
 typedef struct {
     double factor;
     double h_2[DIMS];    
     Matrix3D rho;
-} ProblemSolver;
+} Constants;
+
+typedef struct {
+    Matrix3D slice[2]; //old and new
+    Plane neighbours[NB_COUNT];
+
+    size_t old;
+    size_t new;
+
+    Constants constants;
+
+    PlaneIterator plane_mul_iterators[NB_COUNT];
+    PlaneIterator plane_iterators[NB_COUNT];
+    PlaneIterator plane_edged_iterators[NB_COUNT];
+    size_t plane_neighbor_indices[NB_COUNT];
+} LocalProblem;
 
 typedef double (*func_r3) (double x, double y, double z);
 
