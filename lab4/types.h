@@ -5,16 +5,10 @@
 #include <stdbool.h>
 #include <mpi.h>
 
-#include "functional.h"
+#define NB_LEFT 0 
+#define NB_RIGHT 1 
 
-#define NB_LEFT 0 //(X, F)
-#define NB_RIGHT 1 //(X, T)
-#define NB_FRONT 2 //(Y, F)
-#define NB_BACK 3 //(X, T)
-#define NB_UP 4 //(Z, F)
-#define NB_DOWN 5 //(Z, T)
-
-#define NB_COUNT 6
+#define NB_COUNT 2
 
 #define DIMS 3
 #define X 0 
@@ -24,28 +18,23 @@
 typedef struct {
     int proc_count;
     int proc_rank;
+    int proc_coord;
+
+    int data_per_proc;
+    int last_data_count;
 
     MPI_Comm global_comm;
 
-    int comm_dims[DIMS]; //(x, y, z)
-    int comm_coords[DIMS];
-
-    MPI_Datatype plane_types[DIMS];
     int neighbours[NB_COUNT];
 
-    size_t task_dims[DIMS];
-    size_t task_coords[DIMS];
+    int task_dims[DIMS];
+    int task_coords[DIMS];
 } ProcMeta;
 
 typedef struct {
-    size_t dimensions[3];
+    int dimensions[3];
     double* data;
 } Matrix3D;
-
-typedef struct {
-    size_t dimensions[2];
-    double* data;
-} Plane;
 
 typedef struct {
     double factor;
@@ -55,17 +44,17 @@ typedef struct {
 
 typedef struct {
     Matrix3D slice[2]; //old and new
-    Plane neighbours[NB_COUNT];
+    int slice_dims[DIMS];
+    int inner_dims[DIMS];
+    int inner_offset[DIMS];
 
-    size_t old;
-    size_t new;
+    int plane_x_coords[NB_COUNT];
+    int plane_neighbour_x_coords[NB_COUNT];
+
+    int old;
+    int new;
 
     Constants constants;
-
-    PlaneIterator plane_mul_iterators[NB_COUNT];
-    PlaneIterator plane_iterators[NB_COUNT];
-    PlaneIterator plane_edged_iterators[NB_COUNT];
-    size_t plane_neighbor_indices[NB_COUNT];
 } LocalProblem;
 
 typedef double (*func_r3) (double x, double y, double z);
@@ -78,7 +67,7 @@ typedef struct {
     func_r3 phi;
     func_r3 rho;
 
-    size_t discrete_dimensions[DIMS];
+    int discrete_dimensions[DIMS];
     double local_area[DIMS];
 } ProblemData;
 

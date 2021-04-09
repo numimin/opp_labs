@@ -1,6 +1,6 @@
 #include "problem_data.h"
 
-double pd_h(const ProblemData* this, size_t coord) {
+double pd_h(const ProblemData* this, int coord) {
     return this->local_area[coord];
 }
 
@@ -29,23 +29,23 @@ double pd_factor(const ProblemData* this) {
     );
 }
 
-double pd_area(const ProblemData* this, size_t coord, size_t index) {
+double pd_area(const ProblemData* this, int coord, int index) {
     return this->area_offset[coord] + index * pd_h(this, coord);
 }
 
-double pd_area_x(const ProblemData* this, size_t x) {
+double pd_area_x(const ProblemData* this, int x) {
     return pd_area(this, X, x);
 }
 
-double pd_area_y(const ProblemData* this, size_t y) {
+double pd_area_y(const ProblemData* this, int y) {
     return pd_area(this, Y, y);
 }
 
-double pd_area_z(const ProblemData* this, size_t z) {
+double pd_area_z(const ProblemData* this, int z) {
     return pd_area(this, Z, z);
 }
 
-double pd_func(const ProblemData* this, const size_t discrete_point[DIMS], func_r3 func) {
+double pd_func(const ProblemData* this, const int discrete_point[DIMS], func_r3 func) {
     const double x = pd_area_x(this, discrete_point[X]);
     const double y = pd_area_y(this, discrete_point[Y]);
     const double z = pd_area_z(this, discrete_point[Z]);
@@ -53,11 +53,21 @@ double pd_func(const ProblemData* this, const size_t discrete_point[DIMS], func_
     return func(x, y, z);
 }
 
-double pd_rho(const ProblemData* this, const size_t discrete_point[DIMS]) {
+double pd_rho_ar(const ProblemData* this, const int discrete_point[DIMS]) {
     return pd_func(this, discrete_point, this->rho);
 }
 
-double pd_phi(const ProblemData* this, const size_t discrete_point[DIMS]) {
+double pd_rho(const ProblemData* this, int x, int y, int z) {
+    const int discrete_point[DIMS] = {x, y, z};
+    return pd_func(this, discrete_point, this->rho);
+}
+
+double pd_phi_ar(const ProblemData* this, const int discrete_point[DIMS]) {
+    return pd_func(this, discrete_point, this->phi);
+}
+
+double pd_phi(const ProblemData* this, int x, int y, int z) {
+    const int discrete_point[DIMS] = {x, y, z};
     return pd_func(this, discrete_point, this->phi);
 }
 
@@ -99,18 +109,18 @@ double rho(double x, double y, double z) {
     return 6 - A * phi(x, y, z);
 }
 
-size_t pd_disc(const ProblemData* this, size_t coord) {
+int pd_disc(const ProblemData* this, int coord) {
     return this->discrete_dimensions[coord];
 }
 
-size_t pd_disc_x(const ProblemData* this) {
+int pd_disc_x(const ProblemData* this) {
     return pd_disc(this, X);
 }
 
-size_t pd_disc_y(const ProblemData* this) {
+int pd_disc_y(const ProblemData* this) {
     return pd_disc(this, Y);
 }
 
-size_t pd_disc_z(const ProblemData* this) {
+int pd_disc_z(const ProblemData* this) {
     return pd_disc(this, Z);
 }
