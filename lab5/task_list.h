@@ -15,16 +15,21 @@ typedef struct {
     TaskNode* tail;
 
     size_t size;
+    bool starving;
 
     pthread_mutex_t lock;
+    size_t starving_threshold;
 } TaskList;
 
-bool tl_init(TaskList* this);
+bool tl_init(TaskList* this, size_t starving_threshold);
 void tl_free(TaskList* this);
 
 bool tl_add(TaskList* this, size_t task);
 bool tl_pop(TaskList* this, size_t* task);
 
 size_t tl_size(TaskList* this);
+
+bool tl_starving(TaskList* this);
+void tl_reset_starving(TaskList* this);
 
 #endif // !LAB5_TASK_LIST_H

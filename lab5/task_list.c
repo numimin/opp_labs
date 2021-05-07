@@ -4,13 +4,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-/*#define LOCK(MUTEX, BLOCK, FINALLY) { \
-    bool __lock_error = false;\
-    pthread_mutex_lock(MUTEX); do {BLOCK} while (0); pthread_mutex_unlock(MUTEX);\
-    if (__lock_error) {FINALLY}; }
-
-#define THROW_IN_LOCK {__lock_error = true; break;}*/
-
 TaskNode* tn_init(size_t task) {
     TaskNode* this = malloc(sizeof(*this));
     if (this == NULL) {
@@ -23,7 +16,7 @@ TaskNode* tn_init(size_t task) {
     return this;
 }
 
-bool tl_init(TaskList* this) {
+bool tl_init(TaskList* this, size_t starving_threshold) {
     if (this == NULL) return false;
     memset(this, 0, sizeof(*this));
 
@@ -33,6 +26,9 @@ bool tl_init(TaskList* this) {
         return false;
     }
 
+    this->starving_threshold = starving_threshold;
+    this->starving = false;
+    
     return true;
 }
 
@@ -91,6 +87,8 @@ bool tl_pop(TaskList* this, size_t* task) {
     memcpy(task, &this->head->task, sizeof(*task));
     remove_unsafe(this);
 
+    if (this->size <= this->starving_threshold) this->starving = true;
+
     pthread_mutex_unlock(&this->lock);
 
     return true;
@@ -113,4 +111,18 @@ size_t tl_size(TaskList* this) {
     pthread_mutex_unlock(&this->lock);
 
     return size;
+}
+
+bool tl_starving(TaskList* this) {    
+    pthread_mutex_lock(&this->lock);
+    const bool starving = this->starving;
+    pthread_mutex_unlock(&this->lock);
+
+    return starving;
+}
+
+void tl_reset_starving(TaskList* this) {
+    pthread_mutex_lock(&this->lock);
+    this->starving = false;
+    pthread_mutex_unlock(&this->lock);
 }
